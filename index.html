@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EduShare - File Management System</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Inter', sans-serif;
+            }
+            .loader {
+                border-top-color: #3498db;
+                animation: spinner 1.5s linear infinite;
+            }
+            @keyframes spinner {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <div id="app">
+            <!-- Navigation -->
+            <nav class="bg-white shadow-lg">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="flex justify-between items-center h-16">
+                        <div class="flex items-center">
+                            <span class="text-xl font-bold text-blue-600">EduShare</span>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span id="userInfo" class="text-gray-700"></span>
+                            <button id="logoutBtn" onclick="logout()" class="hidden px-4 py-2 text-sm text-white bg-red-500 rounded hover:bg-red-600">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Login/Register Form -->
+            <div id="authForm" class="max-w-md mx-auto mt-10 bg-white p-8 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Login</h2>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700">Email</label>
+                        <input type="email" id="email" required class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700">Password</label>
+                        <input type="password" id="password" required class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">Login/Register</button>
+                </form>
+            </div>
+
+            <!-- Main Content -->
+            <div id="mainContent" class="hidden max-w-7xl mx-auto mt-10 px-4">
+                <!-- Teacher Controls -->
+                <div id="teacherControls" class="hidden mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold mb-4">Teacher Controls</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-medium mb-2">Upload Assignment</h4>
+                                <input type="file" id="teacherFileUpload" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                            </div>
+                            <button onclick="uploadFile(true)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Upload</button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold mb-4">Student Management</h3>
+                        <div id="studentList" class="space-y-2">
+                            <!-- Student list will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student View -->
+                <div id="studentView" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold mb-4">Submit Assignment</h3>
+                        <div class="space-y-4">
+                            <input type="file" id="studentFileUpload" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                            <button onclick="uploadFile(false)" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Submit</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Files List -->
+                <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-semibold mb-4">Files</h3>
+                    <div id="filesList" class="space-y-4">
+                        <!-- Files will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let currentUser = null;
+            const appSlug = 'edu-share-123456';
+            const teacherEmails = ['djankit0324@gmail.com', '']; // Add the other email here
+
+            // Generate a random user ID if not exists
+            if (!localStorage.getItem('userId')) {
+                localStorage.setItem('userId', 'user_' + Math.random().toString(36).substr(2, 9));
+            }
+
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const isTeacher = teacherEmails.includes(email);
+
+                // Simple login/register logic
+                currentUser = {
+                    id: localStorage.getItem('userId'),
+                    email,
+                    isTeacher
+                };
+
+                // Store user data
+                await saveUserData(currentUser);
+                
+                document.getElementById('authForm').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+                document.getElementById('logoutBtn').classList.remove('hidden');
+                document.getElementById('userInfo').textContent = `${email} (${isTeacher ? 'Teacher' : 'Student'})`;
+
+                if (isTeacher) {
+                    document.getElementById('teacherControls').classList.remove('hidden');
+                    loadStudents();
+                } else {
+                    document.getElementById('studentView').classList.remove('hidden');
+                }
+
+                loadFiles();
+            });
+
+            async function saveUserData(userData) {
+                try {
+                    const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'create',
+                            collection: 'users',
+                            data: userData
+                        })
+                    });
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Error saving user data:', error);
+                }
+            }
+
+            async function uploadFile(isTeacher) {
+                const fileInput = document.getElementById(isTeacher ? 'teacherFileUpload' : 'studentFileUpload');
+                const file = fileInput.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('userId', currentUser.id);
+                formData.append('appSlug', appSlug);
+
+                try {
+                    // Upload file
+                    const uploadResponse = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/storage/upload', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2'
+                        },
+                        body: formData
+                    });
+                    const uploadData = await uploadResponse.json();
+
+                    // Save file metadata
+                    await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'create',
+                            collection: 'files',
+                            data: {
+                                fileName: file.name,
+                                fileUrl: uploadData.url,
+                                filePath: uploadData.path,
+                                uploadedBy: currentUser.email,
+                                isTeacherFile: isTeacher,
+                                uploadDate: new Date().toISOString()
+                            }
+                        })
+                    });
+
+                    alert('File uploaded successfully!');
+                    loadFiles();
+                    fileInput.value = '';
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    alert('Error uploading file');
+                }
+            }
+
+            async function loadFiles() {
+                try {
+                    const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'read',
+                            collection: 'files'
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    const filesList = document.getElementById('filesList');
+                    filesList.innerHTML = '';
+
+                    data.result.forEach(file => {
+                        const fileElement = document.createElement('div');
+                        fileElement.className = 'flex items-center justify-between p-4 border rounded-lg';
+                        fileElement.innerHTML = `
+                            <div>
+                                <p class="font-medium">${file.fileName}</p>
+                                <p class="text-sm text-gray-500">Uploaded by: ${file.uploadedBy}</p>
+                                <p class="text-sm text-gray-500">Date: ${new Date(file.uploadDate).toLocaleString()}</p>
+                            </div>
+                            <div class="space-x-2">
+                                <a href="${file.fileUrl}" target="_blank" class="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                    <i class="bi bi-download mr-1"></i> Download
+                                </a>
+                                ${currentUser.isTeacher ? `
+                                    <button onclick="deleteFile('${file._id}', '${file.filePath}')" class="inline-flex items-center px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                                        <i class="bi bi-trash mr-1"></i> Delete
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                        filesList.appendChild(fileElement);
+                    });
+                } catch (error) {
+                    console.error('Error loading files:', error);
+                }
+            }
+
+            async function loadStudents() {
+                try {
+                    const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'read',
+                            collection: 'users',
+                            conditions: {
+                                isTeacher: false
+                            }
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    const studentList = document.getElementById('studentList');
+                    studentList.innerHTML = '';
+
+                    data.result.forEach(student => {
+                        const studentElement = document.createElement('div');
+                        studentElement.className = 'flex items-center justify-between p-4 border rounded-lg';
+                        studentElement.innerHTML = `
+                            <p>${student.email}</p>
+                            <button onclick="deleteStudent('${student._id}')" class="text-red-500 hover:text-red-700">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        `;
+                        studentList.appendChild(studentElement);
+                    });
+                } catch (error) {
+                    console.error('Error loading students:', error);
+                }
+            }
+
+            async function deleteStudent(studentId) {
+                if (!confirm('Are you sure you want to delete this student?')) return;
+
+                try {
+                    await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'delete',
+                            collection: 'users',
+                            id: studentId
+                        })
+                    });
+
+                    alert('Student deleted successfully');
+                    loadStudents();
+                } catch (error) {
+                    console.error('Error deleting student:', error);
+                    alert('Error deleting student');
+                }
+            }
+
+            async function deleteFile(fileId, filePath) {
+                if (!confirm('Are you sure you want to delete this file?')) return;
+
+                try {
+                    // Delete file from storage
+                    await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/storage/delete', {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            userId: currentUser.id,
+                            appSlug,
+                            filePath
+                        })
+                    });
+
+                    // Delete file metadata
+                    await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer fjrSbdYBZFM3UFUjuZ999z4U3nM2',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'delete',
+                            collection: 'files',
+                            id: fileId
+                        })
+                    });
+
+                    alert('File deleted successfully');
+                    loadFiles();
+                } catch (error) {
+                    console.error('Error deleting file:', error);
+                    alert('Error deleting file');
+                }
+            }
+
+            function logout() {
+                currentUser = null;
+                document.getElementById('authForm').classList.remove('hidden');
+                document.getElementById('mainContent').classList.add('hidden');
+                document.getElementById('logoutBtn').classList.add('hidden');
+                document.getElementById('userInfo').textContent = '';
+                document.getElementById('teacherControls').classList.add('hidden');
+                document.getElementById('studentView').classList.add('hidden');
+                document.getElementById('loginForm').reset();
+            }
+        </script>
+    <script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+    </body>
+    </html>
